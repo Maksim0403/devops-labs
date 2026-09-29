@@ -60,7 +60,7 @@ async def test_get_monthly_statistics_manager(
 
     expected_months_count = 2
     assert len(data) == expected_months_count
-
+    print(data)
     stats_feb = next(s for s in data if "2024-02" in s["month"])
     stats_jan = next(s for s in data if "2024-01" in s["month"])
 

@@ -53,7 +53,7 @@ class RouteStatusService:
             raise HTTPException(
                 status_code=409,
                 detail=f"Invalid status transition: "
-                       f"{current} → {status_in.status}",
+                f"{current} → {status_in.status}",
             )
 
         new_status = await crud_route_status.create_route_status(
@@ -81,7 +81,6 @@ class RouteStatusService:
             # Use the vehicle assigned by manager
             vehicle = None
             if route.vehicle_id:
-
                 vehicle = await vehicle_service.get_vehicle_or_404(
                     db, route.vehicle_id
                 )

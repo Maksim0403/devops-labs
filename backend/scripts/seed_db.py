@@ -124,13 +124,12 @@ async def seed_db():
             order = Order(
                 title=f"Доставка {random.choice(categories)}",
                 description=f"Перевезення вантажу за маршрутом "
-                            f"{origin} - {destination}. "
-                            + fake.sentence(),
+                f"{origin} - {destination}. " + fake.sentence(),
                 origin_address=f"{origin}, вул. {fake.street_name()}, "
-                               f"{fake.building_number()}",
+                f"{fake.building_number()}",
                 destination_address=f"{destination},"
-                                    f" вул. {fake.street_name()}, "
-                                    f"{fake.building_number()}",
+                f" вул. {fake.street_name()}, "
+                f"{fake.building_number()}",
                 weight=random.uniform(1000, 10000),
                 distance=random.uniform(150, 600),
                 status=status,
@@ -165,9 +164,9 @@ async def seed_db():
                     driver_id=driver.id,
                     vehicle_id=vehicle.id if vehicle else None,
                     started_at=datetime.now()
-                               - timedelta(days=random.randint(1, 5)),
+                    - timedelta(days=random.randint(1, 5)),
                     eta=datetime.now()
-                        + timedelta(hours=random.randint(10, 48)),
+                    + timedelta(hours=random.randint(10, 48)),
                     completed_at=datetime.now()
                     if status == OrderStatus.COMPLETED
                     else None,

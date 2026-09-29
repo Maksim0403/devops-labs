@@ -125,6 +125,7 @@ async def test_route_sync_order_status(client: AsyncClient):
         f"/api/v1/dashboard/orders/{order_id}/assign",
         json={"driver_id": driver_id, "eta": eta},
     )
+    print(assign_resp.status_code, assign_resp.text)
     route_id = assign_resp.json()["id"]
 
     await client.post("/api/v1/auth/logout")
