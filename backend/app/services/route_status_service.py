@@ -12,6 +12,7 @@ from app.schemas.route import RouteUpdate
 from app.schemas.route_status import RouteStatusCreate
 from app.services.invoice_service import invoice_service
 from app.services.route_service import route_service
+from app.services.vehicle_service import vehicle_service
 
 if TYPE_CHECKING:
     from app.models.route_status import RouteStatus
@@ -28,7 +29,7 @@ class RouteStatusService:
     async def get_statuses(self, db: AsyncSession, route_id: int):
         return await crud_route_status.get_statuses_by_route_id(db, route_id)
 
-    async def add_status(
+    async def add_status(  # noqa: PLR0912
         self,
         db: AsyncSession,
         route_id: int,
@@ -52,7 +53,7 @@ class RouteStatusService:
             raise HTTPException(
                 status_code=409,
                 detail=f"Invalid status transition: "
-                f"{current} → {status_in.status}",
+                       f"{current} → {status_in.status}",
             )
 
         new_status = await crud_route_status.create_route_status(
@@ -80,12 +81,16 @@ class RouteStatusService:
             # Use the vehicle assigned by manager
             vehicle = None
             if route.vehicle_id:
-                from app.services.vehicle_service import vehicle_service
-                vehicle = await vehicle_service.get_vehicle_or_404(db, route.vehicle_id)
+
+                vehicle = await vehicle_service.get_vehicle_or_404(
+                    db, route.vehicle_id
+                )
             elif route.driver_id:
                 # Fallback for old routes without vehicle_id
-                from app.services.vehicle_service import vehicle_service
-                vehicles = await vehicle_service.get_driver_vehicles(db, route.driver_id)
+
+                vehicles = await vehicle_service.get_driver_vehicles(
+                    db, route.driver_id
+                )
                 if vehicles:
                     vehicle = vehicles[0]
 
