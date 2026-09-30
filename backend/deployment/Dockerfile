@@ -14,6 +14,10 @@ RUN uv sync --no-install-project --no-dev --locked
 
 FROM python:3.13-slim AS runtime
 
+RUN apt-get update \
+    && apt-get install -y --only-upgrade openssl libssl3t64 openssl-provider-legacy \
+    && rm -rf /var/lib/apt/lists/* \
+
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
