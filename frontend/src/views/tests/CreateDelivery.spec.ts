@@ -1,13 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { createPinia, setActivePinia } from 'pinia'
+import { useToastStore } from '@/stores/toast'
 
-const { mockPost } = vi.hoisted(() => ({
+const { mockPost, mockGetTemplates } = vi.hoisted(() => ({
   mockPost: vi.fn(),
+  mockGetTemplates: vi.fn(),
 }))
 
 vi.mock('@/api/axios', () => ({
   default: { post: mockPost },
+}))
+
+vi.mock('@/api/orders', () => ({
+  ordersApi: { getTemplates: mockGetTemplates },
 }))
 
 import CreateDelivery from '../CreateDelivery.vue'
@@ -17,15 +24,41 @@ const createWrapper = () => {
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
-      { path: '/dashboard', component: { template: '<div />' } },
+      { path: '/recipient/orders', component: { template: '<div />' } },
     ],
   })
 
-  return { wrapper: mount(CreateDelivery, { global: { plugins: [router] } }), router }
+  const pinia = createPinia()
+  setActivePinia(pinia)
+
+  const wrapper = mount(CreateDelivery, { global: { plugins: [pinia, router] } })
+  return { wrapper, router, toastStore: useToastStore(pinia) }
+}
+
+const fillOrderForm = async (
+  wrapper: ReturnType<typeof createWrapper>['wrapper'],
+  options: { title?: string; weight?: string; description?: string } = {},
+) => {
+  const textInputs = wrapper.findAll('input[type="text"]')
+  const numberInputs = wrapper.findAll('input[type="number"]')
+
+  await textInputs.at(0)!.setValue(options.title ?? 'Electronics to Kyiv')
+  await textInputs.at(1)!.setValue('Warehouse A')
+  await textInputs.at(2)!.setValue('Kyiv')
+  await numberInputs.at(0)!.setValue('10')
+  await numberInputs.at(1)!.setValue(options.weight ?? '5.5')
+
+  if (options.description) {
+    await wrapper.find('textarea').setValue(options.description)
+  }
 }
 
 describe('CreateDelivery', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    mockGetTemplates.mockResolvedValue([])
+  })
 
   describe('rendering', () => {
     it('displays the page heading', () => {
@@ -64,18 +97,18 @@ describe('CreateDelivery', () => {
       mockPost.mockResolvedValueOnce({ data: { id: 1 } })
       const { wrapper } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Electronics to Kyiv') // title
-      await inputs.at(1)!.setValue('5.5') // weight
-
-      await wrapper.find('textarea').setValue('Fragile items')
+      await fillOrderForm(wrapper, { description: 'Fragile items' })
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
       expect(mockPost).toHaveBeenCalledWith('/orders/', {
         title: 'Electronics to Kyiv',
-        description: 'Fragile items',
+        description: 'Quantity: N/A, Volume: N/A. Fragile items',
         weight: 5.5,
+        distance: 10,
+        total_amount: 247.5,
+        origin_address: 'Warehouse A',
+        destination_address: 'Kyiv',
         is_template: false,
       })
     })
@@ -84,9 +117,7 @@ describe('CreateDelivery', () => {
       mockPost.mockResolvedValueOnce({ data: { id: 1 } })
       const { wrapper, router } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Test order')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Test order', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -98,25 +129,22 @@ describe('CreateDelivery', () => {
   describe('error handling', () => {
     it('does not redirect if request fails', async () => {
       mockPost.mockRejectedValueOnce(new Error('Network Error'))
-      const { wrapper, router } = createWrapper()
+      const { wrapper, router, toastStore } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Title')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Valid title', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
       expect(router.currentRoute.value.path).toBe('/')
+      expect(toastStore.toasts[0]?.message).toBe('Something went wrong. Please try again.')
     })
 
     it('re-enables the submit button after a failed request', async () => {
       mockPost.mockRejectedValueOnce(new Error('Network Error'))
       const { wrapper } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Title')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Valid title', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -126,26 +154,22 @@ describe('CreateDelivery', () => {
   })
 
   describe('loading state', () => {
-    it('shows "Creating..." while request is pending', async () => {
+    it('shows "Processing..." while request is pending', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
       const { wrapper } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Title')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Valid title', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
 
-      expect(wrapper.find('button[type="submit"]').text()).toContain('Creating...')
+      expect(wrapper.find('button[type="submit"]').text()).toContain('Processing...')
     })
 
     it('disables the submit button while loading', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
       const { wrapper } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Title')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Valid title', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
 
@@ -156,9 +180,7 @@ describe('CreateDelivery', () => {
       mockPost.mockResolvedValueOnce({ data: {} })
       const { wrapper } = createWrapper()
 
-      const inputs = wrapper.findAll('input')
-      await inputs.at(0)!.setValue('Title')
-      await inputs.at(1)!.setValue('1.0')
+      await fillOrderForm(wrapper, { title: 'Valid title', weight: '1.0' })
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()

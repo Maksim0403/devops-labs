@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
+import { useToastStore } from '@/stores/toast'
 import LoginView from '../LoginView.vue'
 
 vi.mock('@/components/ui/BaseInput.vue', () => ({
@@ -63,9 +64,16 @@ const createWrapper = () => {
   const pinia = createPinia()
   setActivePinia(pinia)
 
-  return mount(LoginView, {
-    global: { plugins: [router, pinia] },
+  const wrapper = mount(LoginView, {
+    global: { plugins: [pinia, router] },
   })
+  return { wrapper, router, toastStore: useToastStore(pinia) }
+}
+
+const fillLoginForm = async (wrapper: ReturnType<typeof mount>) => {
+  const inputs = wrapper.findAll('input')
+  await inputs.at(0)!.setValue('test@example.com')
+  await inputs.at(1)!.setValue('password123')
 }
 
 describe('LoginView', () => {
@@ -75,28 +83,28 @@ describe('LoginView', () => {
 
   describe('render', () => {
     it('shows header "Log in"', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('h1').text()).toBe('Log in')
     })
 
     it('shows email and password fields', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       const inputs = wrapper.findAll('input')
       expect(inputs.length).toBeGreaterThanOrEqual(2)
     })
 
     it('shows "Log In" button', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('button[type="submit"]').text()).toBe('Log In')
     })
 
     it('doesn`t show error message at the start', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('[data-testid="error-message"]').exists()).toBe(false)
     })
 
     it('contains reference for /register', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('a[href="/register"], [to="/register"]').exists()).toBe(true)
     })
   })
@@ -104,8 +112,8 @@ describe('LoginView', () => {
   describe('successfull login', () => {
     it('redirects manager on /dashboard', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'manager' } })
-      const wrapper = createWrapper()
-      const router = wrapper.vm.$router
+      const { wrapper, router } = createWrapper()
+      await fillLoginForm(wrapper)
 
       const inputs = wrapper.findAll('input')
       await inputs.at(0)!.setValue('admin@test.com')
@@ -119,8 +127,8 @@ describe('LoginView', () => {
 
     it('redirects driver on /driver/route', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'driver' } })
-      const wrapper = createWrapper()
-      const router = wrapper.vm.$router
+      const { wrapper, router } = createWrapper()
+      await fillLoginForm(wrapper)
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -130,8 +138,8 @@ describe('LoginView', () => {
 
     it('redirects client on /recipient/billing', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'client' } })
-      const wrapper = createWrapper()
-      const router = wrapper.vm.$router
+      const { wrapper, router } = createWrapper()
+      await fillLoginForm(wrapper)
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -141,8 +149,8 @@ describe('LoginView', () => {
 
     it('unknown role — redirect on /dashboard', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'superadmin' } })
-      const wrapper = createWrapper()
-      const router = wrapper.vm.$router
+      const { wrapper, router } = createWrapper()
+      await fillLoginForm(wrapper)
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -159,11 +167,12 @@ describe('LoginView', () => {
       })
       mockPost.mockRejectedValueOnce(axiosError)
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
+      await fillLoginForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Invalid email or password')
+      expect(toastStore.toasts[0]?.message).toBe('Invalid email or password')
     })
 
     it('shows general error if detail is absent', async () => {
@@ -171,11 +180,12 @@ describe('LoginView', () => {
       const axiosError = new axios.AxiosError('Network Error')
       mockPost.mockRejectedValueOnce(axiosError)
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
+      await fillLoginForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Server connection error')
+      expect(toastStore.toasts[0]?.message).toBe('Something went wrong. Please try again.')
     })
   })
 
@@ -183,7 +193,8 @@ describe('LoginView', () => {
     it('button shows "Logging in..." during request', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
 
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
+      await fillLoginForm(wrapper)
       await wrapper.find('form').trigger('submit')
 
       expect(wrapper.find('button[type="submit"]').text()).toBe('Logging in...')
@@ -192,7 +203,8 @@ describe('LoginView', () => {
     it('кнопка задізейблена під час завантаження', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
 
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
+      await fillLoginForm(wrapper)
       await wrapper.find('form').trigger('submit')
 
       expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
@@ -201,7 +213,8 @@ describe('LoginView', () => {
     it('button becomes active after finishing request', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'manager' } })
 
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
+      await fillLoginForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
@@ -212,7 +225,7 @@ describe('LoginView', () => {
   describe('API call', () => {
     it('sends email and password on /auth/login', async () => {
       mockPost.mockResolvedValueOnce({ data: { role: 'manager' } })
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
 
       const inputs = wrapper.findAll('input')
       await inputs.at(0)!.setValue('test@example.com')
