@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
+import { createPinia, setActivePinia } from 'pinia'
+import { useToastStore } from '@/stores/toast'
 
 vi.mock('@/components/ui/BaseInput.vue', () => ({
   default: {
     name: 'BaseInput',
     template:
-      '<input :type="type || \'text\'" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-    props: ['modelValue', 'label', 'placeholder', 'type'],
+      '<div><input :type="type || \'text\'" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" /><span v-if="error">{{ error }}</span></div>',
+    props: ['modelValue', 'label', 'placeholder', 'type', 'error'],
     emits: ['update:modelValue'],
   },
 }))
@@ -47,15 +49,6 @@ vi.mock('@/api/axios.ts', () => ({
   default: { post: mockPost },
 }))
 
-// --- Mock router (RegisterView imports router directly, not useRouter) ---
-const { mockPush } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-}))
-
-vi.mock('@/router', () => ({
-  default: { push: mockPush },
-}))
-
 import RegisterView from '../RegisterView.vue'
 
 const createWrapper = () => {
@@ -67,10 +60,24 @@ const createWrapper = () => {
     ],
   })
 
-  return mount(RegisterView, { global: { plugins: [router] } })
+  const pinia = createPinia()
+  setActivePinia(pinia)
+
+  const wrapper = mount(RegisterView, { global: { plugins: [pinia, router] } })
+  return { wrapper, router, toastStore: useToastStore(pinia) }
 }
 
-const fillForm = async (wrapper: ReturnType<typeof createWrapper>, overrides = {}) => {
+const fillForm = async (
+  wrapper: ReturnType<typeof createWrapper>['wrapper'],
+  overrides: Partial<{
+    fullName: string
+    email: string
+    phone: string
+    role: string
+    password: string
+    confirm: string
+  }> = {},
+) => {
   const defaults = {
     fullName: 'John Doe',
     email: 'john@example.com',
@@ -96,48 +103,48 @@ describe('RegisterView', () => {
   // --- Rendering ---
   describe('rendering', () => {
     it('displays the page heading', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('h1').text()).toBe('Create an account')
     })
 
     it('renders 5 input fields', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.findAll('input').length).toBe(5)
     })
 
     it('renders the role select', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('select').exists()).toBe(true)
     })
 
     it('submit button shows "Create Account" by default', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.find('button[type="submit"]').text()).toBe('Create Account')
     })
 
     it('does not show an error message initially', () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       expect(wrapper.text()).not.toContain('password')
     })
 
     it('renders a link to /login', () => {
-      const wrapper = createWrapper()
-      expect(wrapper.find('[to="/login"]').exists()).toBe(false)
+      const { wrapper } = createWrapper()
+      expect(wrapper.find('a[href="/login"]').exists()).toBe(true)
     })
   })
 
   // --- Validation ---
   describe('password validation', () => {
     it('shows error when passwords do not match', async () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper, { password: 'abc12345', confirm: 'different' })
       await wrapper.find('form').trigger('submit')
 
-      expect(wrapper.text()).toContain('Passwords does not match')
+      expect(wrapper.text()).toContain('Passwords do not match')
     })
 
     it('does not call API when passwords do not match', async () => {
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper, { password: 'abc12345', confirm: 'different' })
       await wrapper.find('form').trigger('submit')
 
@@ -148,7 +155,7 @@ describe('RegisterView', () => {
   describe('successful registration', () => {
     it('sends POST to /auth/register with correct payload', async () => {
       mockPost.mockResolvedValueOnce({ data: {} })
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
@@ -164,12 +171,12 @@ describe('RegisterView', () => {
 
     it('redirects to /login after successful registration', async () => {
       mockPost.mockResolvedValueOnce({ data: {} })
-      const wrapper = createWrapper()
+      const { wrapper, router } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(mockPush).toHaveBeenCalledWith('/login')
+      expect(router.currentRoute.value.path).toBe('/login')
     })
   })
 
@@ -182,12 +189,12 @@ describe('RegisterView', () => {
       })
       mockPost.mockRejectedValueOnce(axiosError)
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Email already registered')
+      expect(toastStore.toasts[0]?.message).toBe('Email already registered')
     })
 
     it('shows validation error message when detail is an array', async () => {
@@ -197,12 +204,12 @@ describe('RegisterView', () => {
       })
       mockPost.mockRejectedValueOnce(axiosError)
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Please, fill all the necessary fields correctly.')
+      expect(toastStore.toasts[0]?.message).toBe('Please fill all required fields correctly.')
     })
 
     it('shows connection error when no detail in response', async () => {
@@ -210,23 +217,23 @@ describe('RegisterView', () => {
       const axiosError = new axios.AxiosError('Network Error')
       mockPost.mockRejectedValueOnce(axiosError)
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Server connection failed')
+      expect(toastStore.toasts[0]?.message).toBe('Something went wrong. Please try again.')
     })
 
     it('shows unknown error message for non-axios errors', async () => {
       mockPost.mockRejectedValueOnce(new Error('Something went wrong'))
 
-      const wrapper = createWrapper()
+      const { wrapper, toastStore } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('Unknown error')
+      expect(toastStore.toasts[0]?.message).toBe('Something went wrong. Please try again.')
     })
   })
 
@@ -234,7 +241,7 @@ describe('RegisterView', () => {
   describe('loading state', () => {
     it('shows "Creating Account..." while request is pending', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
 
@@ -243,7 +250,7 @@ describe('RegisterView', () => {
 
     it('disables submit button while loading', async () => {
       mockPost.mockReturnValueOnce(new Promise(() => {}))
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
 
@@ -252,7 +259,7 @@ describe('RegisterView', () => {
 
     it('re-enables submit button after request completes', async () => {
       mockPost.mockResolvedValueOnce({ data: {} })
-      const wrapper = createWrapper()
+      const { wrapper } = createWrapper()
       await fillForm(wrapper)
       await wrapper.find('form').trigger('submit')
       await flushPromises()

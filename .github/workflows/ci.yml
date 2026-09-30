@@ -99,8 +99,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test
-        run: npm run test:unit --if-present
+      - name: Test (Vitest)
+        run: npx vitest run --passWithNoTests
 
   # ---------- Пункт 4: образи + сканування ----------
   docker-build:
