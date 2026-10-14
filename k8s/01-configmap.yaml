@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logiflow-config
+  namespace: logiflow
+  labels:
+    app.kubernetes.io/part-of: logiflow
+data:
+  DEBUG: "false"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "logiflow"
+  DB_USER: "logiflow"
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  COOKIE_SECURE: "false"
+  CORS_ORIGINS: "http://localhost,http://127.0.0.1"
+  AVERAGE_SPEED_KMH: "60.0"
+  S3_ENDPOINT_URL: "http://seaweedfs:8333"
+  S3_BUCKET_NAME: "logiflow-storage"
+  S3_REGION: "us-east-1"
