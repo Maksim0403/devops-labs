@@ -1,0 +1,14 @@
+{{- if .Values.postgres.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "logiflow.fullname" . }}-postgres-data
+  labels:
+    {{- include "logiflow.labels" (dict "root" . "name" "postgres") | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.postgres.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}
+{{- end }}

@@ -1,0 +1,14 @@
+LogiFlow has been installed as release {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+Open the application at http://{{ .Values.ingress.host }}/ (configure DNS or your hosts file for the ingress controller).
+{{- else if eq .Values.frontend.service.type "NodePort" }}
+Open the application at http://$(minikube ip):{{ .Values.frontend.service.nodePort }}/, or run:
+  minikube service {{ include "logiflow.frontendService" . }} -n {{ .Release.Namespace }} --url
+{{- else }}
+Forward the frontend service and open it in a browser:
+  kubectl port-forward -n {{ .Release.Namespace }} service/{{ include "logiflow.frontendService" . }} 8080:{{ .Values.frontend.service.port }}
+{{- end }}
+
+Run the release test with:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

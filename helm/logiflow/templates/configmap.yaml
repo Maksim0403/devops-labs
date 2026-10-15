@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logiflow.configMap" . }}
+  labels:
+    {{- include "logiflow.labels" (dict "root" . "name" "config") | nindent 4 }}
+data:
+  DEBUG: {{ .Values.config.DEBUG | quote }}
+  DB_HOST: {{ include "logiflow.databaseHost" . | quote }}
+  DB_PORT: {{ .Values.postgres.service.port | quote }}
+  DB_NAME: {{ .Values.config.DB_NAME | quote }}
+  DB_USER: {{ .Values.config.DB_USER | quote }}
+  ALGORITHM: {{ .Values.config.ALGORITHM | quote }}
+  ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.config.ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
+  REFRESH_TOKEN_EXPIRE_DAYS: {{ .Values.config.REFRESH_TOKEN_EXPIRE_DAYS | quote }}
+  COOKIE_SECURE: {{ .Values.config.COOKIE_SECURE | quote }}
+  CORS_ORIGINS: {{ .Values.config.CORS_ORIGINS | quote }}
+  AVERAGE_SPEED_KMH: {{ .Values.config.AVERAGE_SPEED_KMH | quote }}
+  S3_ENDPOINT_URL: {{ .Values.config.S3_ENDPOINT_URL | quote }}
+  S3_BUCKET_NAME: {{ .Values.config.S3_BUCKET_NAME | quote }}
+  S3_REGION: {{ .Values.config.S3_REGION | quote }}

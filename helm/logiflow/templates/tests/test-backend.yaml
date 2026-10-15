@@ -1,0 +1,28 @@
+{{- if .Values.helmTest.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "logiflow.fullname" . }}-test-backend
+  labels:
+    {{- include "logiflow.labels" (dict "root" . "name" "helm-test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test-backend
+      image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
+      imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+      command:
+        - python
+        - -c
+        - |
+          import urllib.request
+          url = "http://{{ include "logiflow.backendService" . }}:{{ .Values.backend.service.port }}/api/v1/health"
+          with urllib.request.urlopen(url, timeout=10) as response:
+              assert response.status == 200, f"unexpected HTTP status: {response.status}"
+              print(f"Backend test passed: {url}")
+      resources:
+        {{- toYaml .Values.migration.resources | nindent 8 }}
+{{- end }}
