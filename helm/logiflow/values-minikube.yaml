@@ -1,0 +1,45 @@
+images:
+  backend:
+    repository: ghcr.io/maksim0403/devops-labs-backend
+    tag: "1.2.0"
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: ghcr.io/maksim0403/devops-labs-frontend
+    tag: "1.2.0"
+    pullPolicy: IfNotPresent
+
+existingSecret: logiflow-secret
+
+backend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+frontend:
+  replicas: 1
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 96Mi
+
+postgres:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+ingress:
+  enabled: false
