@@ -19,6 +19,8 @@ RUN apt-get update \
         zlib1g openssl libssl3t64 openssl-provider-legacy \
     && rm -rf /var/lib/apt/lists/*
 
+RUN python -m pip uninstall -y pip
+
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 

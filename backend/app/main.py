@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import random
+import sys
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from http import HTTPStatus
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -37,7 +39,7 @@ SKIP_PATHS = {"/metrics", "/health"}
 
 access_log = logging.getLogger("access")
 if not access_log.handlers:
-    handler = logging.StreamHandler()
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter("%(message)s"))
     access_log.addHandler(handler)
 access_log.setLevel(logging.INFO)
@@ -110,6 +112,9 @@ async def observe(request: Request, call_next):
             access_log.info(
                 json.dumps(
                     {
+                        "time": datetime.now(timezone.utc).isoformat(
+                            timespec="milliseconds"
+                        ),
                         "level": (
                             "error"
                             if status_code
@@ -120,6 +125,7 @@ async def observe(request: Request, call_next):
                         "method": request.method,
                         "route": route_path,
                         "status": int(status_code),
+                        "status_code": int(status_code),
                         "duration_ms": round(duration * 1000, 1),
                         "version": os.getenv("APP_VERSION", "dev"),
                     }
