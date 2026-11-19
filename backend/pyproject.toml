@@ -17,6 +17,7 @@ dependencies = [
     "aioboto3>=15.5.0",
     "botocore>=1.40.61",
     "faker>=40.23.0",
+    "prometheus-client>=0.25.0",
 ]
 
 [dependency-groups]
